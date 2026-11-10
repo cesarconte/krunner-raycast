@@ -1,0 +1,141 @@
+#!/usr/bin/env python3
+# SPDX-FileCopyrightText: 2026 Cesar <yugurta@gmail.com>
+# SPDX-License-Identifier: GPL-3.0-or-later
+"""
+krunner-raycast: CLI y demonio D-Bus de KRaycast Runner para KDE Plasma 6.
+"""
+
+import sys
+import os
+import argparse
+import subprocess
+from pathlib import Path
+
+SCRIPT_DIR = Path(__file__).resolve().parent
+PROJECT_DIR = SCRIPT_DIR.parent
+if (PROJECT_DIR / "src").exists():
+    LIB_DIR = PROJECT_DIR
+else:
+    LIB_DIR = Path.home() / ".local/share/krunner-raycast"
+
+sys.path.insert(0, str(LIB_DIR / "src"))
+
+from runner_service import run_daemon, KRunnerRaycastService
+from providers.system_actions import SystemActionsProvider
+from providers.tools_actions import ToolsActionsProvider
+from providers.web_bangs import WebBangsProvider
+from providers.dev_utils import DevUtilsProvider
+from providers.process_killer import ProcessKillerProvider
+
+
+def cmd_daemon(args):
+    """Ejecuta el servicio D-Bus."""
+    run_daemon()
+
+
+def cmd_query(args):
+    """Prueba una consulta directamente sin pasar por KRunner."""
+    q = " ".join(args.text)
+    providers = [
+        WebBangsProvider(),
+        DevUtilsProvider(),
+        SystemActionsProvider(),
+        ToolsActionsProvider(),
+        ProcessKillerProvider(),
+    ]
+    total = 0
+    print(f"🔍 Consulta: '{q}'\n" + "=" * 60)
+    for p in providers:
+        res = p.match(q)
+        if res:
+            for item in res:
+                total += 1
+                print(f"[{item.get('category', 'Raycast')}] {item['text']}")
+                print(f"  • ID:         {item['id']}")
+                print(f"  • Subtexto:   {item.get('subtext', '')}")
+                print(f"  • Relevancia: {item.get('relevance', 0.0)}")
+                print(f"  • Icono:      {item.get('icon', '')}")
+                print("-" * 60)
+
+    if total == 0:
+        print("  (Sin resultados)")
+
+
+def cmd_run(args):
+    """Ejecuta una acción por su ID."""
+    action_id = args.action_id
+    providers = [
+        WebBangsProvider(),
+        DevUtilsProvider(),
+        SystemActionsProvider(),
+        ToolsActionsProvider(),
+        ProcessKillerProvider(),
+    ]
+    for p in providers:
+        if p.run(action_id):
+            print(f"✓ Acción '{action_id}' ejecutada con éxito por {p.__class__.__name__}")
+            return
+    print(f"⚠️ Ningún proveedor reconoció la acción '{action_id}'")
+
+
+def cmd_status(args):
+    """Comprueba el estado del servicio."""
+    print("🚀 ESTADO DE KRAYCAST RUNNER")
+    print("=" * 55)
+
+    # Comprobar servicio systemd
+    res = subprocess.run(
+        ["systemctl", "--user", "is-active", "krunner-raycast.service"],
+        capture_output=True, text=True
+    )
+    status = res.stdout.strip()
+    icon = "🟢" if status == "active" else "⚪"
+    print(f"Servicio systemd: {icon} {status} (krunner-raycast.service)")
+
+    # Comprobar registro D-Bus
+    res_dbus = subprocess.run(
+        ["qdbus6", "org.cesar.KRunnerRaycast"],
+        capture_output=True, text=True
+    )
+    dbus_icon = "🟢 Activo" if res_dbus.returncode == 0 else "⚪ Inactivo (bajo demanda)"
+    print(f"Sesión D-Bus:     {dbus_icon} (org.cesar.KRunnerRaycast)")
+
+
+def main():
+    parser = argparse.ArgumentParser(
+        description="krunner-raycast: Suite de Acciones Rápidas estilo Raycast para KRunner"
+    )
+    subparsers = parser.add_subparsers(dest="command", help="Comandos disponibles")
+
+    # daemon
+    subparsers.add_parser("daemon", help="Inicia el servicio D-Bus org.kde.krunner1")
+
+    # query
+    p_query = subparsers.add_parser("query", help="Prueba una búsqueda directamente desde terminal")
+    p_query.add_argument("text", nargs="+", help="Término a buscar (ej. '!gh linux', 'uuid', 'bloquear')")
+
+    # run
+    p_run = subparsers.add_parser("run", help="Ejecuta una acción por su ID")
+    p_run.add_argument("action_id", help="ID de la acción a ejecutar")
+
+    # status
+    subparsers.add_parser("status", help="Comprueba el estado del servicio")
+
+    parser.add_argument("-v", "--version", action="version", version="KRunner-Raycast 1.0.0")
+
+    args = parser.parse_args()
+
+    if args.command == "daemon":
+        cmd_daemon(args)
+    elif args.command == "query":
+        cmd_query(args)
+    elif args.command == "run":
+        cmd_run(args)
+    elif args.command == "status":
+        cmd_status(args)
+    else:
+        cmd_status(args)
+
+
+if __name__ == "__main__":
+    main()

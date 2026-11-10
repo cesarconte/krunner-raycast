@@ -1,0 +1,4 @@
+[D-BUS Service]
+Name=org.cesar.KRunnerRaycast
+Exec=/home/cesar/.local/bin/krunner-raycast daemon
+SystemdService=krunner-raycast.service

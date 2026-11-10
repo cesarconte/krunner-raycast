@@ -1,0 +1,13 @@
+[Unit]
+Description=KRaycast Runner: Raycast Quick Actions for KRunner
+Documentation=https://github.com/cesarconte/krunner-raycast
+After=plasma-core.target
+
+[Service]
+Type=simple
+ExecStart=%h/.local/bin/krunner-raycast daemon
+Restart=on-failure
+RestartSec=3s
+
+[Install]
+WantedBy=default.target

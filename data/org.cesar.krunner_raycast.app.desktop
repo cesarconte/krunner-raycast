@@ -1,0 +1,10 @@
+[Desktop Entry]
+Type=Application
+Name=Raycast Runner
+GenericName=Acciones Rápidas para KRunner
+Comment=Acciones rápidas del sistema, utilidades de desarrollo y búsquedas web estilo Raycast
+Exec=krunner-raycast status
+Icon=system-search
+Terminal=true
+Categories=Utility;KDE;
+StartupNotify=false
